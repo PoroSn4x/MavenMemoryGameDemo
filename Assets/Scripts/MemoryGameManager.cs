@@ -5,33 +5,150 @@ using UnityEngine;
 
 public class MemoryGameManager : MonoBehaviour
 {
-    public Object blinkingAnimation;
+    public Object blinkingAnimation, expandingDeathZone;
     public Material baseMat, correctMat, wrongMat;
-    public float delay, blinkDuration;
+    public float delay, blinkDuration, speedIncrease;
 
     private enum MemoryState { Showing, Playing, Waiting };
-    private enum Segment { TopLeft, TopRight, Bottom };
     private MemoryState curState = MemoryState.Waiting;
 
-    private float timer = 0;
-    private int temp = 0;
+    private float timer = 2f;
+
+    private Segment[] segmentOrder;
+    private int segmentTracker;
+
+    private IList<Segment> triggers;
 
     // Start is called before the first frame update
     void Start()
     {
-        //Blink(Segment.TopRight, 2, baseMat);
+        triggers = new List<Segment>();
+        StartMemoryGame();
+        //curState = MemoryState.Playing;
+    }
+
+    public void StartMemoryGame()
+    {
+        segmentOrder = GenerateOrder(5);
+        curState = MemoryState.Showing;
+        segmentTracker = 0;
+    }
+
+    private Segment[] GenerateOrder(int length)
+    {
+        Segment[] order = new Segment[length];
+        int prev = -1;
+        for(int i = 0; i < length; i++)
+        {
+            int next = Random.Range(0, 3);
+            // No two consecutive segments allowed
+            if(next == prev)
+            {
+                int coinflip = Random.Range(1, 3);
+                next = (next + coinflip) % 3;
+            }
+            order[i] = (Segment)next;
+            prev = next;
+        }
+        return order;
     }
 
     // Update is called once per frame
     void Update()
     {
-        timer -= Time.deltaTime;
-        if(timer <= 0)
+        switch (curState)
         {
-            // Show next blink
-            Blink((Segment)temp++, blinkDuration, baseMat);
-            timer = delay + blinkDuration;
+            case MemoryState.Showing:
+                UpdateShowing();
+                break;
+            case MemoryState.Playing:
+                UpdatePlaying();
+                break;
+            case MemoryState.Waiting:
+            default:
+                break;
+        };
+       
+
+    }
+
+    private void UpdateShowing()
+    {
+        timer -= Time.deltaTime;
+        if (timer <= 0)
+        {
+            if(segmentTracker != segmentOrder.Length)
+            {
+                // Show next blink
+                Blink((Segment)segmentOrder[segmentTracker++], blinkDuration, baseMat);
+                timer = delay + blinkDuration;
+            }
+            else
+            {
+                // Show and tell is over, move on to the next state
+                curState = MemoryState.Playing;
+                segmentTracker = 0;
+                // Clear all triggers except the last one
+                Segment currentSegment = triggers[triggers.Count - 1];
+                triggers.Clear();
+                triggers.Add(currentSegment);
+
+                Instantiate(expandingDeathZone, GetComponent<Transform>());
+            }
         }
+    }
+
+    private void UpdatePlaying()
+    {
+        if(gameObject.GetComponentInChildren<ExpandingDeathZoneScript>().Collides)
+        {
+            Debug.Log("Game Over!");
+            //Destroy(GameObject.Find("Exile"));
+            Reset();
+        }
+
+        //Debug.Log("Updating Playing");
+        foreach(Segment segment in triggers)
+        {
+            if(segment == segmentOrder[segmentTracker])
+            {
+                if (++segmentTracker >= segmentOrder.Length)
+                {
+                    Blink(Segment.TopLeft, blinkDuration * 2, correctMat);
+                    Blink(Segment.TopRight, blinkDuration * 2, correctMat);
+                    Blink(Segment.Bottom, blinkDuration * 2, correctMat);
+                    Reset();
+                    break;
+                }
+                else
+                {
+                    Blink(segment, blinkDuration, correctMat);
+                }
+            }
+            else
+            {
+                Blink(segment, blinkDuration, wrongMat);
+                // Apply penalty for wrong memory
+                gameObject.GetComponentInChildren<ExpandingDeathZoneScript>().expandingSpeed += speedIncrease;
+            }
+        }
+        
+        triggers.Clear();
+    }
+
+    private void Reset()
+    {
+        Destroy(GameObject.FindGameObjectWithTag("ExpandingDeathZone"));
+        curState = MemoryState.Waiting;
+        triggers.Clear();
+        segmentOrder = null;
+        segmentTracker = 0;
+
+    }
+
+    public void SegmentTriggered(Segment segment)
+    {
+        triggers.Add(segment);
     }
 
     private void Blink(Segment segment, float duration, Material mat)

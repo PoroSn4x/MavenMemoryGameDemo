@@ -5,6 +5,7 @@ TagManager:
   serializedVersion: 2
   tags:
   - MemorySegments
+  - ExpandingDeathZone
   layers:
   - Default
   - TransparentFX
