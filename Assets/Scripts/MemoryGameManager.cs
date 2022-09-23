@@ -2,34 +2,55 @@ using System.Collections;
 using System.Collections.Generic;
 using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class MemoryGameManager : MonoBehaviour
 {
     public Object blinkingAnimation, expandingDeathZone;
     public Material baseMat, correctMat, wrongMat;
-    public float delay, blinkDuration, speedIncrease;
+    public float delay, blinkDuration, speedIncrease, delayBetweenGames;
+    public int length;
 
-    private enum MemoryState { Showing, Playing, Waiting };
+    private enum MemoryState { Showing, Playing, Waiting, GameOver };
     private MemoryState curState = MemoryState.Waiting;
 
-    private float timer = 2f;
+    private float timer;
 
     private Segment[] segmentOrder;
     private int segmentTracker;
+    private Segment prevSegment = Segment.Nothing;
 
     private IList<Segment> triggers;
+
+    private int wins = 0;
+    private int difficulty;
 
     // Start is called before the first frame update
     void Start()
     {
+        timer = delayBetweenGames;
         triggers = new List<Segment>();
-        StartMemoryGame();
+
+        AdjustDifficulty();
+
+
+        StartMemoryGame(length);
         //curState = MemoryState.Playing;
     }
 
-    public void StartMemoryGame()
+    private void AdjustDifficulty()
     {
-        segmentOrder = GenerateOrder(5);
+        difficulty = PlayerPrefs.GetInt("difficulty");
+        // Based on difficulty, change variables here
+        switch (difficulty)
+        {
+
+        }
+    }
+
+    public void StartMemoryGame(int l)
+    {
+        segmentOrder = GenerateOrder(l);
         curState = MemoryState.Showing;
         segmentTracker = 0;
     }
@@ -64,11 +85,22 @@ public class MemoryGameManager : MonoBehaviour
             case MemoryState.Playing:
                 UpdatePlaying();
                 break;
+            case MemoryState.GameOver:
+                UpdateGameOver();
+                break;
             case MemoryState.Waiting:
             default:
                 break;
         };
-       
+    }
+
+    private void UpdateGameOver()
+    {
+        timer -= Time.deltaTime;
+        if (timer <= 0)
+        {
+            SceneManager.LoadScene(0);
+        }
 
     }
 
@@ -103,8 +135,13 @@ public class MemoryGameManager : MonoBehaviour
         if(gameObject.GetComponentInChildren<ExpandingDeathZoneScript>().Collides)
         {
             Debug.Log("Game Over!");
-            //Destroy(GameObject.Find("Exile"));
+            Blink(Segment.TopLeft, blinkDuration, wrongMat);
+            Blink(Segment.TopRight, blinkDuration, wrongMat);
+            Blink(Segment.Bottom, blinkDuration, wrongMat);
+            Destroy(GameObject.Find("Exile"));
             Reset();
+            curState = MemoryState.GameOver;
+            timer = 1.5f;
         }
 
         //Debug.Log("Updating Playing");
@@ -114,18 +151,22 @@ public class MemoryGameManager : MonoBehaviour
             {
                 if (++segmentTracker >= segmentOrder.Length)
                 {
-                    Blink(Segment.TopLeft, blinkDuration * 2, correctMat);
-                    Blink(Segment.TopRight, blinkDuration * 2, correctMat);
-                    Blink(Segment.Bottom, blinkDuration * 2, correctMat);
+                    Blink(Segment.TopLeft, blinkDuration, correctMat);
+                    Blink(Segment.TopRight, blinkDuration, correctMat);
+                    Blink(Segment.Bottom, blinkDuration, correctMat);
                     Reset();
+                    // Start a new memory game which is one longer
+                    wins++;
+                    StartMemoryGame(length + wins);
                     break;
                 }
                 else
                 {
                     Blink(segment, blinkDuration, correctMat);
+                    prevSegment = segment;
                 }
             }
-            else
+            else if (segment != prevSegment)
             {
                 Blink(segment, blinkDuration, wrongMat);
                 // Apply penalty for wrong memory
@@ -143,7 +184,8 @@ public class MemoryGameManager : MonoBehaviour
         triggers.Clear();
         segmentOrder = null;
         segmentTracker = 0;
-
+        timer = delayBetweenGames;
+        prevSegment = Segment.Nothing;
     }
 
     public void SegmentTriggered(Segment segment)

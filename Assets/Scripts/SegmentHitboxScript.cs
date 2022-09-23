@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public enum Segment { TopLeft, TopRight, Bottom };
+public enum Segment { TopLeft, TopRight, Bottom, Nothing };
 
 public class SegmentHitboxScript : MonoBehaviour
 {
