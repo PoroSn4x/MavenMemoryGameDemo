@@ -3,13 +3,14 @@ using System.Collections.Generic;
 using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using TMPro;
 
 public class MemoryGameManager : MonoBehaviour
 {
     public Object blinkingAnimation, expandingDeathZone;
     public Material baseMat, correctMat, wrongMat;
     public float delay, blinkDuration, speedIncrease, delayBetweenGames;
-    public int length;
+    public int length, reqWins;
 
     private enum MemoryState { Showing, Playing, Waiting, GameOver };
     private MemoryState curState = MemoryState.Waiting;
@@ -44,7 +45,18 @@ public class MemoryGameManager : MonoBehaviour
         // Based on difficulty, change variables here
         switch (difficulty)
         {
-
+            case 0:
+                length = 4;
+                delay = 1.5f;
+                break;
+            case 1:
+                length = 5;
+                delay = 1f;
+                break;
+            case 2:
+                length = 7;
+                delay = 0.2f;
+                break;
         }
     }
 
@@ -109,7 +121,7 @@ public class MemoryGameManager : MonoBehaviour
         timer -= Time.deltaTime;
         if (timer <= 0)
         {
-            if(segmentTracker != segmentOrder.Length)
+            if(segmentTracker < segmentOrder.Length)
             {
                 // Show next blink
                 Blink((Segment)segmentOrder[segmentTracker++], blinkDuration, baseMat);
@@ -157,7 +169,18 @@ public class MemoryGameManager : MonoBehaviour
                     Reset();
                     // Start a new memory game which is one longer
                     wins++;
-                    StartMemoryGame(length + wins);
+                    UpdateWinText();
+                    if(wins >= reqWins)
+                    {
+                        // You won
+                        curState = MemoryState.GameOver;
+                        timer = 2.5f;
+                    }
+                    else
+                    {
+                        StartMemoryGame(length);
+
+                    }
                     break;
                 }
                 else
@@ -175,6 +198,12 @@ public class MemoryGameManager : MonoBehaviour
         }
         
         triggers.Clear();
+    }
+
+    private void UpdateWinText()
+    {
+        GameObject text = GameObject.Find("WinText");
+        text.GetComponent<TextMeshProUGUI>().text = "Wins: " + wins + "/3";
     }
 
     private void Reset()
